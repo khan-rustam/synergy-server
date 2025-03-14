@@ -53,19 +53,6 @@ const blogSchema = new mongoose.Schema(
 
 const Blog = mongoose.model("Blog", blogSchema);
 
-// Event Model
-const eventSchema = new mongoose.Schema(
-  {
-    title: { type: String, required: true },
-    description: { type: String, required: true },
-    date: { type: Date, required: true },
-    location: { type: String, required: true },
-    image: { type: String },
-  },
-  { timestamps: true }
-);
-
-const Event = mongoose.model("Event", eventSchema);
 
 // Slide Model
 const slideSchema = new mongoose.Schema(
@@ -388,28 +375,33 @@ const blogController = {
       res.status(500).json({ success: false, error: error.message });
     }
   },
-};
-
-// Event Controllers
-const eventController = {
-  create: async (req, res) => {
+  
+  getById: async (req, res) => {
     try {
-      const event = await Event.create(req.body);
-      res.status(201).json({ success: true, data: event });
+      const blog = await Blog.findById(req.params.id);
+      
+      if (!blog) {
+        return res.status(404).json({ 
+          success: false, 
+          error: "Blog not found" 
+        });
+      }
+      
+      res.json({ success: true, data: blog });
     } catch (error) {
+      // Handle invalid ID format
+      if (error.kind === 'ObjectId') {
+        return res.status(400).json({ 
+          success: false, 
+          error: "Invalid blog ID format" 
+        });
+      }
+      
       res.status(500).json({ success: false, error: error.message });
     }
   },
-
-  getAll: async (req, res) => {
-    try {
-      const events = await Event.find().sort({ date: 1 });
-      res.json({ success: true, data: events });
-    } catch (error) {
-      res.status(500).json({ success: false, error: error.message });
-    }
-  },
 };
+
 
 // Slide Controllers
 const slideController = {
@@ -643,11 +635,8 @@ app.post(
 app.post("/api/blog", protect, admin, blogController.create);
 app.get("/api/blog", blogController.getAll);
 app.get("/api/blog/get-all", blogController.getAll);
+app.get("/api/blog/get-by-id/:id", blogController.getById);
 
-// Event Routes
-app.post("/api/event", protect, admin, eventController.create);
-app.get("/api/event", eventController.getAll);
-app.get("/api/event/get-all", eventController.getAll);
 
 // Slide Routes
 app.post("/api/slide", protect, admin, slideController.create);
