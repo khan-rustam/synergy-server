@@ -45,8 +45,10 @@ const blogSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     content: { type: String, required: true },
-    image: { type: String },
-    author: { type: String, required: true },
+    imageUrl: { type: String, required: true },
+    tags: { type: [String], default: [] },
+    status: { type: String, enum: ['draft', 'published'], default: 'draft' },
+    author: { type: String, default: 'Admin' }
   },
   { timestamps: true }
 );
@@ -57,8 +59,7 @@ const Blog = mongoose.model("Blog", blogSchema);
 // Slide Model
 const slideSchema = new mongoose.Schema(
   {
-    title: { type: String },
-    image: { type: String, required: true },
+    imageUrl: { type: String, required: true }
   },
   { timestamps: true }
 );
@@ -68,11 +69,11 @@ const Slide = mongoose.model("Slide", slideSchema);
 // Testimonial Model
 const testimonialSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
-    position: { type: String, required: true },
-    company: { type: String, required: true },
-    testimonial: { type: String, required: true },
-    image: { type: String },
+    clientName: { type: String, required: true },
+    companyName: { type: String, required: true },
+    rating: { type: Number, required: true, min: 1, max: 5 },
+    description: { type: String, required: true },
+    imageUrl: { type: String, required: true }
   },
   { timestamps: true }
 );
@@ -85,6 +86,7 @@ const contactSchema = new mongoose.Schema(
     name: { type: String, required: true },
     email: { type: String, required: true },
     message: { type: String, required: true },
+    isRead: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
@@ -94,8 +96,7 @@ const Contact = mongoose.model("Contact", contactSchema);
 // Client Logo Model
 const clientLogoSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
-    image: { type: String, required: true },
+    imageUrl: { type: String, required: true }
   },
   { timestamps: true }
 );
@@ -131,6 +132,7 @@ const protect = async (req, res, next) => {
 
 const admin = (req, res, next) => {
   if (req.user && req.user.isAdmin) {
+    console.log("🔑 Admin authentication successful");
     next();
   } else {
     res
@@ -486,6 +488,24 @@ const contactController = {
     }
   },
 
+  markAsRead: async (req, res) => {
+    try {
+      const contact = await Contact.findByIdAndUpdate(
+        req.params.id,
+        { isRead: true },
+        { new: true }
+      );
+      
+      if (!contact) {
+        return res.status(404).json({ success: false, error: "Contact not found" });
+      }
+      
+      res.json({ success: true, data: contact, message: "Contact marked as read" });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
   submit: async (req, res) => {
     let dbSuccess = false;
     let emailSuccess = false;
@@ -632,32 +652,91 @@ app.post(
 );
 
 // Blog Routes
-app.post("/api/blog", protect, admin, blogController.create);
+app.post("/api/blog/new", protect, admin, blogController.create);
 app.get("/api/blog", blogController.getAll);
 app.get("/api/blog/get-all", blogController.getAll);
 app.get("/api/blog/get-by-id/:id", blogController.getById);
+app.delete("/api/blog/delete/:id", protect, admin, async (req, res) => {
+  try {
+    const blog = await Blog.findByIdAndDelete(req.params.id);
+    if (!blog) {
+      return res.status(404).json({ success: false, error: "Blog not found" });
+    }
+    res.json({ success: true, message: "Blog deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 
 // Slide Routes
+app.post("/api/slide/new", protect, admin, slideController.create);
 app.post("/api/slide", protect, admin, slideController.create);
 app.get("/api/slide", slideController.getAll);
 app.get("/api/slide/get-all", slideController.getAll);
+app.delete("/api/slide/delete/:id", protect, admin, async (req, res) => {
+  try {
+    const slide = await Slide.findByIdAndDelete(req.params.id);
+    if (!slide) {
+      return res.status(404).json({ success: false, error: "Slide not found" });
+    }
+    res.json({ success: true, message: "Slide deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // Testimonial Routes
+app.post("/api/testimonial/new", protect, admin, testimonialController.create);
 app.post("/api/testimonial", protect, admin, testimonialController.create);
 app.get("/api/testimonial", testimonialController.getAll);
 app.get("/api/testimonial/get-all", testimonialController.getAll);
+app.delete("/api/testimonial/delete/:id", protect, admin, async (req, res) => {
+  try {
+    const testimonial = await Testimonial.findByIdAndDelete(req.params.id);
+    if (!testimonial) {
+      return res.status(404).json({ success: false, error: "Testimonial not found" });
+    }
+    res.json({ success: true, message: "Testimonial deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // Client Logo Routes
+app.post("/api/client-logo/new", protect, admin, clientLogoController.create);
 app.post("/api/client-logo", protect, admin, clientLogoController.create);
 app.get("/api/client-logo", clientLogoController.getAll);
 app.get("/api/client-logo/get-all", clientLogoController.getAll);
+app.delete("/api/client-logo/delete/:id", protect, admin, async (req, res) => {
+  try {
+    const clientLogo = await ClientLogo.findByIdAndDelete(req.params.id);
+    if (!clientLogo) {
+      return res.status(404).json({ success: false, error: "Client logo not found" });
+    }
+    res.json({ success: true, message: "Client logo deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // Contact Routes
 app.post("/api/contact", contactController.create);
 app.post("/api/contact/submit", contactController.submit);
 app.get("/api/contact", protect, admin, contactController.getAll);
 app.get("/api/contact/get-all", protect, admin, contactController.getAll);
+app.put("/api/contact/:id/mark-read", protect, admin, contactController.markAsRead);
+app.delete("/api/contact/:id", protect, admin, async (req, res) => {
+  try {
+    const contact = await Contact.findByIdAndDelete(req.params.id);
+    if (!contact) {
+      return res.status(404).json({ success: false, error: "Contact not found" });
+    }
+    res.json({ success: true, message: "Contact deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // Cloudinary Route
 app.delete(
@@ -669,11 +748,14 @@ app.delete(
     const timestamp = Math.round(new Date().getTime() / 1000);
 
     try {
+      console.log(`🖼️ Attempting to delete Cloudinary image with public_id: ${publicId}`);
+      
       if (
         !process.env.CLOUDINARY_CLOUD_NAME ||
         !process.env.CLOUDINARY_API_KEY ||
         !process.env.CLOUDINARY_API_SECRET
       ) {
+        console.error("❌ Missing Cloudinary configuration");
         throw new Error("Missing Cloudinary configuration");
       }
 
@@ -684,31 +766,45 @@ app.delete(
         )
         .digest("hex");
 
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/destroy`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            public_id: publicId,
-            signature: signature,
-            api_key: process.env.CLOUDINARY_API_KEY,
-            timestamp: timestamp,
-          }),
-        }
-      );
+      console.log(`🔐 Generated signature for Cloudinary deletion: ${signature.substring(0, 10)}...`);
+      
+      const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/image/destroy`;
+      console.log(`🌐 Sending request to Cloudinary URL: ${cloudinaryUrl}`);
+      
+      const requestBody = {
+        public_id: publicId,
+        signature: signature,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        timestamp: timestamp,
+      };
+      
+      console.log(`📦 Request payload: ${JSON.stringify(requestBody)}`);
 
+      const response = await fetch(cloudinaryUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log(`📡 Cloudinary response status: ${response.status}`);
+      
       const data = await response.json();
+      console.log(`📄 Cloudinary response data: ${JSON.stringify(data)}`);
+      
       if (data.result !== "ok") {
+        console.error(`❌ Cloudinary deletion failed: ${JSON.stringify(data)}`);
         throw new Error(
           data.error?.message || "Failed to delete image from Cloudinary"
         );
       }
 
+      console.log(`✅ Successfully deleted image from Cloudinary: ${publicId}`);
       res
         .status(200)
         .json({ success: true, message: "Image deleted successfully" });
     } catch (error) {
+      console.error(`❌ Error deleting image from Cloudinary: ${error.message}`);
+      console.error(error.stack);
       res.status(500).json({
         success: false,
         message: "Error deleting image",
